@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-
 std::vector<std::string> GetWallpapers() {
   std::vector<std::string> images;
   DIR *dir;
@@ -70,7 +69,7 @@ int main() {
 
         DrawRectangleRounded(itemRect, 0.2f, 10,
                              hovered ? (Color){220, 220, 220, 255} : WHITE);
-        DrawRectangleRoundedLines(itemRect, 0.2f, 10, 1,
+        DrawRectangleRoundedLines(itemRect, 0.2f, 10,
                                   (Color){200, 200, 200, 255});
 
         std::string fileName =

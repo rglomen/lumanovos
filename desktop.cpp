@@ -281,8 +281,7 @@ int main() {
     // Dock
     Rectangle dockRect = {dockX, dockYPos, dockWidth, 75};
     DrawRectangleRounded(dockRect, 0.35f, 20, currentTheme->dockBg);
-    DrawRectangleRoundedLines(dockRect, 0.35f, 20, 1,
-                              (Color){255, 255, 255, 30});
+    DrawRectangleRoundedLines(dockRect, 0.35f, 20, (Color){255, 255, 255, 30});
 
     // Dock ikonları
     for (int i = 0; i < dockApps.size(); i++) {
