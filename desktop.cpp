@@ -102,6 +102,106 @@ bool showAppMenu = false;
 float menuAnimProgress = 0;
 Texture2D wallpaper = {0};
 
+// Ayarlar için değişkenler
+int settingsTab = 0; // 0: Görünüm, 1: Ekran, 2: Ses, 3: Hakkında
+float masterVolume = 0.8f;
+float musicVolume = 0.7f;
+float effectVolume = 0.9f;
+int currentWallpaperIndex = 0;
+std::vector<std::string> wallpaperList;
+std::string cpuInfo = "";
+std::string memInfo = "";
+std::string diskInfo = "";
+std::string kernelInfo = "";
+
+// Çözünürlük seçenekleri
+struct Resolution {
+  int width;
+  int height;
+  const char *name;
+};
+Resolution resolutions[] = {
+    {800, 600, "800x600"},        {1024, 768, "1024x768"},
+    {1280, 720, "1280x720 (HD)"}, {1280, 800, "1280x800"},
+    {1366, 768, "1366x768"},      {1920, 1080, "1920x1080 (FHD)"},
+};
+int resolutionCount = 6;
+int currentResolution = 3; // Varsayılan 1280x800
+
+// Sistem bilgilerini çek
+void LoadSystemInfo() {
+  // CPU bilgisi
+  FILE *fp = popen(
+      "cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d':' -f2", "r");
+  if (fp) {
+    char buf[256];
+    if (fgets(buf, sizeof(buf), fp)) {
+      cpuInfo = buf;
+      cpuInfo.erase(cpuInfo.find_last_not_of(" \n\r\t") + 1);
+    }
+    pclose(fp);
+  }
+  if (cpuInfo.empty())
+    cpuInfo = "Bilinmiyor";
+
+  // Bellek bilgisi
+  fp = popen("free -h | grep Mem | awk '{print $2}'", "r");
+  if (fp) {
+    char buf[64];
+    if (fgets(buf, sizeof(buf), fp)) {
+      memInfo = buf;
+      memInfo.erase(memInfo.find_last_not_of(" \n\r\t") + 1);
+    }
+    pclose(fp);
+  }
+  if (memInfo.empty())
+    memInfo = "Bilinmiyor";
+
+  // Disk bilgisi
+  fp = popen("df -h / | tail -1 | awk '{print $2}'", "r");
+  if (fp) {
+    char buf[64];
+    if (fgets(buf, sizeof(buf), fp)) {
+      diskInfo = buf;
+      diskInfo.erase(diskInfo.find_last_not_of(" \n\r\t") + 1);
+    }
+    pclose(fp);
+  }
+  if (diskInfo.empty())
+    diskInfo = "Bilinmiyor";
+
+  // Kernel bilgisi
+  fp = popen("uname -r", "r");
+  if (fp) {
+    char buf[64];
+    if (fgets(buf, sizeof(buf), fp)) {
+      kernelInfo = buf;
+      kernelInfo.erase(kernelInfo.find_last_not_of(" \n\r\t") + 1);
+    }
+    pclose(fp);
+  }
+  if (kernelInfo.empty())
+    kernelInfo = "Bilinmiyor";
+}
+
+// Duvar kağıtlarını listele
+void LoadWallpaperList() {
+  wallpaperList.clear();
+  DIR *dir = opendir("images");
+  if (dir) {
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+      std::string name = ent->d_name;
+      if (name.find(".jpg") != std::string::npos ||
+          name.find(".png") != std::string::npos) {
+        wallpaperList.push_back("images/" + name);
+      }
+    }
+    closedir(dir);
+    std::sort(wallpaperList.begin(), wallpaperList.end());
+  }
+}
+
 // ============================================================================
 // YARDIMCI FONKSİYONLAR
 // ============================================================================
@@ -232,8 +332,7 @@ void DrawWindowFrame(Window &win, Vector2 mouse) {
   Rectangle minBtn = {btnX - btnR, btnY - btnR, btnR * 2, btnR * 2};
   bool minHover = CheckCollisionPointRec(mouse, minBtn);
   DrawCircle(btnX, btnY, btnR,
-             minHover ? theme->minimizeBtn
-                      : Fade(theme->minimizeBtn, 0.7f));
+             minHover ? theme->minimizeBtn : Fade(theme->minimizeBtn, 0.7f));
   if (minHover)
     DrawText("-", btnX - 2, btnY - 6, 12, WHITE);
 
@@ -242,8 +341,7 @@ void DrawWindowFrame(Window &win, Vector2 mouse) {
   Rectangle maxBtn = {btnX - btnR, btnY - btnR, btnR * 2, btnR * 2};
   bool maxHover = CheckCollisionPointRec(mouse, maxBtn);
   DrawCircle(btnX, btnY, btnR,
-             maxHover ? theme->maximizeBtn
-                      : Fade(theme->maximizeBtn, 0.7f));
+             maxHover ? theme->maximizeBtn : Fade(theme->maximizeBtn, 0.7f));
   if (maxHover)
     DrawText("+", btnX - 3, btnY - 5, 10, WHITE);
 
@@ -342,45 +440,245 @@ void DrawSettings(Window &win, Vector2 mouse) {
   Rectangle content = {win.bounds.x + 10, win.bounds.y + 45,
                        win.bounds.width - 20, win.bounds.height - 55};
 
-  float y = content.y;
+  // Sol menü (tab seçimi)
+  float menuW = 120;
+  Rectangle menuArea = {content.x, content.y, menuW, content.height};
+  DrawRectangleRounded(menuArea, 0.05f, 8, theme->border);
 
-  // Tema seçimi
-  DrawText("Tema", content.x, y, 16, theme->text);
-  y += 25;
+  const char *tabs[] = {"Gorunum", "Ekran", "Ses", "Hakkinda"};
+  for (int i = 0; i < 4; i++) {
+    Rectangle tabRect = {menuArea.x + 5, menuArea.y + 10 + i * 40, menuW - 10,
+                         35};
+    bool hover = CheckCollisionPointRec(mouse, tabRect);
+    bool active = (settingsTab == i);
 
-  Rectangle darkBtn = {content.x, y, 100, 35};
-  Rectangle lightBtn = {content.x + 110, y, 100, 35};
+    if (active) {
+      DrawRectangleRounded(tabRect, 0.3f, 8, theme->accent);
+    } else if (hover) {
+      DrawRectangleRounded(tabRect, 0.3f, 8, Fade(theme->accent, 0.3f));
+    }
 
-  DrawRectangleRounded(darkBtn, 0.3f, 8,
-                       isDarkTheme ? theme->accent : theme->border);
-  DrawText("Koyu", darkBtn.x + 30, darkBtn.y + 10, 14,
-           isDarkTheme ? WHITE : theme->text);
+    DrawText(tabs[i], tabRect.x + 10, tabRect.y + 10, 14,
+             active ? WHITE : theme->text);
 
-  DrawRectangleRounded(lightBtn, 0.3f, 8,
-                       !isDarkTheme ? theme->accent : theme->border);
-  DrawText("Acik", lightBtn.x + 32, lightBtn.y + 10, 14,
-           !isDarkTheme ? WHITE : theme->text);
-
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-    if (CheckCollisionPointRec(mouse, darkBtn)) {
-      isDarkTheme = true;
-      theme = &darkTheme;
-    } else if (CheckCollisionPointRec(mouse, lightBtn)) {
-      isDarkTheme = false;
-      theme = &lightTheme;
+    if (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      settingsTab = i;
+      if (i == 3 && cpuInfo.empty())
+        LoadSystemInfo();
     }
   }
 
-  y += 50;
+  // Sağ içerik alanı
+  float contentX = content.x + menuW + 15;
+  float contentW = content.width - menuW - 15;
+  float y = content.y + 10;
 
-  // Sistem bilgisi
-  DrawText("Sistem Bilgisi", content.x, y, 16, theme->text);
-  y += 25;
-  DrawText("LumanovOS v2.0", content.x + 10, y, 14, theme->textDim);
-  y += 20;
-  DrawText("Raylib 5.x Tabanli", content.x + 10, y, 14, theme->textDim);
-  y += 20;
-  DrawText("Pencere Yoneticisi: Dahili", content.x + 10, y, 14, theme->textDim);
+  // TAB 0: GÖRÜNÜM
+  if (settingsTab == 0) {
+    DrawText("Tema", contentX, y, 18, theme->text);
+    y += 30;
+
+    Rectangle darkBtn = {contentX, y, 90, 35};
+    Rectangle lightBtn = {contentX + 100, y, 90, 35};
+
+    DrawRectangleRounded(darkBtn, 0.3f, 8,
+                         isDarkTheme ? theme->accent : theme->border);
+    DrawText("Koyu", darkBtn.x + 25, darkBtn.y + 10, 14,
+             isDarkTheme ? WHITE : theme->text);
+
+    DrawRectangleRounded(lightBtn, 0.3f, 8,
+                         !isDarkTheme ? theme->accent : theme->border);
+    DrawText("Acik", lightBtn.x + 28, lightBtn.y + 10, 14,
+             !isDarkTheme ? WHITE : theme->text);
+
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      if (CheckCollisionPointRec(mouse, darkBtn)) {
+        isDarkTheme = true;
+        theme = &darkTheme;
+      } else if (CheckCollisionPointRec(mouse, lightBtn)) {
+        isDarkTheme = false;
+        theme = &lightTheme;
+      }
+    }
+
+    y += 55;
+    DrawText("Arka Plan", contentX, y, 18, theme->text);
+    y += 30;
+
+    // Duvar kağıdı listesini yükle
+    if (wallpaperList.empty())
+      LoadWallpaperList();
+
+    for (int i = 0; i < std::min((int)wallpaperList.size(), 5); i++) {
+      Rectangle wpBtn = {contentX, y, contentW - 10, 30};
+      bool hover = CheckCollisionPointRec(mouse, wpBtn);
+      bool active = (currentWallpaperIndex == i);
+
+      if (active) {
+        DrawRectangleRounded(wpBtn, 0.2f, 8, Fade(theme->accent, 0.4f));
+      } else if (hover) {
+        DrawRectangleRounded(wpBtn, 0.2f, 8, Fade(theme->accent, 0.2f));
+      }
+
+      // Dosya adını çıkar
+      std::string name = wallpaperList[i];
+      size_t pos = name.find_last_of('/');
+      if (pos != std::string::npos)
+        name = name.substr(pos + 1);
+
+      DrawText(active ? "* " : "  ", contentX + 5, y + 7, 14, theme->accent);
+      DrawText(name.c_str(), contentX + 25, y + 7, 14, theme->text);
+
+      if (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        currentWallpaperIndex = i;
+        if (wallpaper.id > 0)
+          UnloadTexture(wallpaper);
+        wallpaper = LoadTexture(wallpaperList[i].c_str());
+      }
+      y += 35;
+    }
+  }
+
+  // TAB 1: EKRAN
+  else if (settingsTab == 1) {
+    DrawText("Cozunurluk", contentX, y, 18, theme->text);
+    y += 30;
+
+    for (int i = 0; i < resolutionCount; i++) {
+      Rectangle resBtn = {contentX, y, contentW - 10, 32};
+      bool hover = CheckCollisionPointRec(mouse, resBtn);
+      bool active = (currentResolution == i);
+
+      if (active) {
+        DrawRectangleRounded(resBtn, 0.2f, 8, Fade(theme->accent, 0.4f));
+      } else if (hover) {
+        DrawRectangleRounded(resBtn, 0.2f, 8, Fade(theme->accent, 0.2f));
+      }
+
+      DrawText(active ? "[*]" : "[ ]", contentX + 8, y + 8, 14, theme->accent);
+      DrawText(resolutions[i].name, contentX + 40, y + 8, 14, theme->text);
+
+      if (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !active) {
+        currentResolution = i;
+        // Çözünürlük değiştir
+        SetWindowSize(resolutions[i].width, resolutions[i].height);
+      }
+      y += 38;
+    }
+
+    y += 10;
+    DrawText("Not: Degisiklik aninda uygulanir", contentX, y, 12,
+             theme->textDim);
+  }
+
+  // TAB 2: SES
+  else if (settingsTab == 2) {
+    DrawText("Ses Ayarlari", contentX, y, 18, theme->text);
+    y += 35;
+
+    // Master Volume
+    DrawText("Ana Ses", contentX, y, 14, theme->text);
+    y += 22;
+    Rectangle masterBar = {contentX, y, contentW - 60, 20};
+    DrawRectangleRounded(masterBar, 0.4f, 8, theme->border);
+    DrawRectangleRounded(
+        {masterBar.x, masterBar.y, masterBar.width * masterVolume, 20}, 0.4f, 8,
+        theme->accent);
+    DrawText(TextFormat("%d%%", (int)(masterVolume * 100)),
+             masterBar.x + masterBar.width + 10, y + 2, 14, theme->text);
+
+    if (CheckCollisionPointRec(mouse, masterBar) &&
+        IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      masterVolume = Clamp((mouse.x - masterBar.x) / masterBar.width, 0, 1);
+    }
+    y += 40;
+
+    // Music Volume
+    DrawText("Muzik", contentX, y, 14, theme->text);
+    y += 22;
+    Rectangle musicBar = {contentX, y, contentW - 60, 20};
+    DrawRectangleRounded(musicBar, 0.4f, 8, theme->border);
+    DrawRectangleRounded(
+        {musicBar.x, musicBar.y, musicBar.width * musicVolume, 20}, 0.4f, 8,
+        (Color){255, 149, 0, 255});
+    DrawText(TextFormat("%d%%", (int)(musicVolume * 100)),
+             musicBar.x + musicBar.width + 10, y + 2, 14, theme->text);
+
+    if (CheckCollisionPointRec(mouse, musicBar) &&
+        IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      musicVolume = Clamp((mouse.x - musicBar.x) / musicBar.width, 0, 1);
+    }
+    y += 40;
+
+    // Effect Volume
+    DrawText("Efektler", contentX, y, 14, theme->text);
+    y += 22;
+    Rectangle effectBar = {contentX, y, contentW - 60, 20};
+    DrawRectangleRounded(effectBar, 0.4f, 8, theme->border);
+    DrawRectangleRounded(
+        {effectBar.x, effectBar.y, effectBar.width * effectVolume, 20}, 0.4f, 8,
+        (Color){40, 200, 64, 255});
+    DrawText(TextFormat("%d%%", (int)(effectVolume * 100)),
+             effectBar.x + effectBar.width + 10, y + 2, 14, theme->text);
+
+    if (CheckCollisionPointRec(mouse, effectBar) &&
+        IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      effectVolume = Clamp((mouse.x - effectBar.x) / effectBar.width, 0, 1);
+    }
+  }
+
+  // TAB 3: HAKKINDA
+  else if (settingsTab == 3) {
+    // LumanovOS Logo ve başlık
+    float cx = contentX + (contentW - 10) / 2;
+
+    DrawCircleGradient(cx, y + 30, 35, theme->accent,
+                       Fade(theme->accent, 0.3f));
+    DrawText("L", cx - 12, y + 10, 40, WHITE);
+    y += 80;
+
+    const char *title = "LumanovOS";
+    int tw = MeasureText(title, 28);
+    DrawText(title, cx - tw / 2, y, 28, theme->text);
+    y += 35;
+
+    DrawText("Versiyon 2.1", cx - MeasureText("Versiyon 2.1", 14) / 2, y, 14,
+             theme->textDim);
+    y += 30;
+
+    // Ayırıcı çizgi
+    DrawRectangle(contentX + 20, y, contentW - 50, 1, theme->border);
+    y += 20;
+
+    // Sistem bilgileri
+    DrawText("Sistem Bilgileri", contentX, y, 16, theme->text);
+    y += 28;
+
+    DrawText("Islemci:", contentX + 10, y, 13, theme->textDim);
+    DrawText(cpuInfo.c_str(), contentX + 80, y, 12, theme->text);
+    y += 22;
+
+    DrawText("Bellek:", contentX + 10, y, 13, theme->textDim);
+    DrawText(memInfo.c_str(), contentX + 80, y, 13, theme->text);
+    y += 22;
+
+    DrawText("Disk:", contentX + 10, y, 13, theme->textDim);
+    DrawText(diskInfo.c_str(), contentX + 80, y, 13, theme->text);
+    y += 22;
+
+    DrawText("Kernel:", contentX + 10, y, 13, theme->textDim);
+    DrawText(kernelInfo.c_str(), contentX + 80, y, 13, theme->text);
+    y += 30;
+
+    // Ayırıcı çizgi
+    DrawRectangle(contentX + 20, y, contentW - 50, 1, theme->border);
+    y += 15;
+
+    DrawText("Raylib 5.x Tabanli Masaustu Ortami", contentX + 10, y, 11,
+             theme->textDim);
+    y += 16;
+    DrawText("2024-2025 Lumanov Projesi", contentX + 10, y, 11, theme->textDim);
+  }
 }
 
 void DrawTerminal(Window &win, Vector2 mouse) {
@@ -453,8 +751,7 @@ void DrawUpdater(Window &win, Vector2 mouse) {
   Rectangle checkBtn = {cx - 100, cy, 200, 40};
   bool checkHover = CheckCollisionPointRec(mouse, checkBtn);
   DrawRectangleRounded(checkBtn, 0.3f, 10,
-                       checkHover ? Fade(theme->accent, 0.8f)
-                                  : theme->accent);
+                       checkHover ? Fade(theme->accent, 0.8f) : theme->accent);
   DrawText("Guncelleme Kontrol Et", checkBtn.x + 20, checkBtn.y + 12, 14,
            WHITE);
 
@@ -608,8 +905,7 @@ void DrawTopBar(Vector2 mouse) {
 
   // Bar arka planı
   DrawRectangle(0, 0, w, 32, theme->topBar);
-  DrawRectangleGradientV(0, 32, w, 3, Fade(BLACK, 0.1f),
-                         Fade(BLACK, 0));
+  DrawRectangleGradientV(0, 32, w, 3, Fade(BLACK, 0.1f), Fade(BLACK, 0));
 
   // Logo
   DrawText("LumanovOS", 15, 8, 16, theme->text);
@@ -625,8 +921,7 @@ void DrawTopBar(Vector2 mouse) {
   Rectangle sysBtn = {(float)w - 90, 4, 25, 24};
   bool sysHover = CheckCollisionPointRec(mouse, sysBtn);
   DrawRectangleRounded(sysBtn, 0.3f, 8,
-                       sysHover ? Fade(theme->accent, 0.3f)
-                                : Fade(WHITE, 0));
+                       sysHover ? Fade(theme->accent, 0.3f) : Fade(WHITE, 0));
   DrawText("S", sysBtn.x + 8, sysBtn.y + 5, 14, theme->text);
 
   if (sysHover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -708,8 +1003,7 @@ void DrawDock(Vector2 mouse) {
       bool hover = CheckCollisionPointRec(mouse, minRect);
 
       DrawRectangleRounded(minRect, 0.2f, 8,
-                           hover ? Fade(theme->accent, 0.5f)
-                                 : theme->border);
+                           hover ? Fade(theme->accent, 0.5f) : theme->border);
       DrawText(win.title.substr(0, 1).c_str(), minX + 14, dockY + 20, 16,
                theme->text);
 
@@ -760,8 +1054,11 @@ void DrawDock(Vector2 mouse) {
         }
       }
       if (!exists) {
+        // Ayarlar için daha büyük pencere
+        float winW = (dockApps[i].appType == APP_SETTINGS) ? 550 : 450;
+        float winH = (dockApps[i].appType == APP_SETTINGS) ? 450 : 350;
         CreateWindow(dockApps[i].name, dockApps[i].appType, 100 + i * 30,
-                     80 + i * 30, 450, 350);
+                     80 + i * 30, winW, winH);
       }
     }
 
