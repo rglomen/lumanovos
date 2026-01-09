@@ -169,14 +169,16 @@ int main() {
           // lumanovos klasorunun icindeki binary'yi calistir
           if (access("lumanovos/main_system", F_OK) == 0) {
             CloseWindow();
-            // chdir ile klasöre gir ve execl ile process'i değiştir
-            // Bu sayede X11 oturumu kapanmaz, launcher yerine main_system
-            // çalışır
-            if (chdir("lumanovos") == 0) {
-              execl("./main_system", "./main_system", (char *)NULL);
+            // Ön planda çalıştır, hatayı logla
+            int result = system("cd lumanovos && ./main_system 2>&1 | tee "
+                                "../desktop_error.log");
+            // main_system kapandıysa log dosyasına bak
+            if (result != 0) {
+              // Hata varsa, launcher yerine hata bilgisi göster
+              system("echo 'main_system hata kodu:' >> ../desktop_error.log");
+              system("echo $? >> ../desktop_error.log");
             }
-            // execl başarısız olursa buraya ulaşılır
-            return 1;
+            return result;
           } else
             status = "HATA: main_system bulunamadı!";
         }
