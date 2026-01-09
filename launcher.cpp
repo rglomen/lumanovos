@@ -3,161 +3,168 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
-enum SystemState {
-  CHECKING_INTERNET,
-  WIFI_SETUP,
-  CHECKING_UPDATES,
-  DOWNLOADING,
-  READY_TO_LAUNCH
-};
 
-struct WifiNetwork {
+// Sistem Durumlari
+enum SystemState { CHECK_INT, WIFI_SET, CHECK_UPD, SYNCING, READY };
+
+struct Wifi {
   std::string ssid;
-  std::string signal;
+  std::string pwr;
 };
 
-SystemState currentState = CHECKING_INTERNET;
-std::string localVersion = "0.0.0";
-std::string remoteVersion = "---";
-std::vector<WifiNetwork> networks;
-std::string statusMessage = "Sistem kontrol ediliyor...";
+// Global degiskenler
+SystemState state = CHECK_INT;
+std::string localV = "0.0.0";
+std::string remoteV = "---";
+std::vector<Wifi> networks;
+std::string status = "Sistem Kontrol Ediliyor...";
 
-bool HasInternet() {
+bool HasConnection() {
   return (system("ping -c 1 8.8.8.8 > /dev/null 2>&1") == 0);
 }
 
-void LoadLocalVersion() {
-  std::ifstream vFile(".version");
-  if (vFile.is_open()) {
-    vFile >> localVersion;
-    vFile.close();
+void LoadLocal() {
+  std::ifstream f(".version");
+  if (f.is_open()) {
+    f >> localV;
+    f.close();
   } else
-    localVersion = "Kurulu Degil";
+    localV = "Yok";
 }
 
-void ScanWifi() {
-  statusMessage = "Aglar taraniyor...";
+void Scan() {
+  status = "Aglar Taraniyor...";
   networks.clear();
-  system("nmcli -t -f SSID,SIGNAL dev wifi > wifi_list.txt");
-  std::ifstream f("wifi_list.txt");
+  system("nmcli -t -f SSID,SIGNAL dev wifi > wl.txt");
+  std::ifstream f("wl.txt");
   std::string line;
   while (std::getline(f, line)) {
-    size_t pos = line.find(':');
-    if (pos != std::string::npos) {
-      std::string ssid = line.substr(0, pos);
-      if (!ssid.empty())
-        networks.push_back({ssid, line.substr(pos + 1)});
+    size_t p = line.find(':');
+    if (p != std::string::npos) {
+      std::string s = line.substr(0, p);
+      if (!s.empty())
+        networks.push_back({s, line.substr(p + 1)});
     }
   }
 }
 
-void CheckRemoteVersion() {
-  statusMessage = "Sunucuya baglaniliyor...";
+void CheckRemote() {
+  status = "Guncelleme Denetleniyor...";
   system("curl -s --max-time 5 "
          "https://raw.githubusercontent.com/rglomen/lumanovos/main/version.txt "
-         "> remote_version.txt");
-  std::ifstream f("remote_version.txt");
+         "> rv.txt");
+  std::ifstream f("rv.txt");
   if (f.is_open()) {
-    f >> remoteVersion;
+    f >> remoteV;
     f.close();
-    if (remoteVersion.find("404") != std::string::npos || remoteVersion.empty())
-      remoteVersion = "Hata";
+    if (remoteV.find("404") != std::string::npos || remoteV.empty())
+      remoteV = "Hata";
   } else
-    remoteVersion = "Hata";
+    remoteV = "Hata";
 }
 
 int main() {
-  // MiniOS/Trixy icinde fontlari yumusatmak icin MSAA aciyoruz
-  SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
+  // MiniOS/Trixy icinde daha temiz goruntu icin
+  SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
   InitWindow(GetScreenWidth(), GetScreenHeight(), "LumanovOS Setup");
   SetTargetFPS(60);
-  LoadLocalVersion();
+  LoadLocal();
 
-  Color appleBg = (Color){245, 245, 247, 255};
-  Color appleBlue = (Color){0, 122, 255, 255};
-  int frameCounter = 0;
+  // Font Ayari - Eger sistemde varsa yukle, yoksa default kullan
+  Font mainFont = GetFontDefault();
+  if (access("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+             F_OK) == 0) {
+    mainFont = LoadFontEx(
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 32,
+        0, 250);
+  }
 
+  int timer = 0;
   while (!WindowShouldClose()) {
-    frameCounter++;
-    switch (currentState) {
-    case CHECKING_INTERNET:
-      if (frameCounter > 60) {
-        if (HasInternet())
-          currentState = CHECKING_UPDATES;
+    timer++;
+    switch (state) {
+    case CHECK_INT:
+      if (timer > 60) {
+        if (HasConnection())
+          state = CHECK_UPD;
         else {
-          ScanWifi();
-          currentState = WIFI_SETUP;
+          Scan();
+          state = WIFI_SET;
         }
       }
       break;
-    case WIFI_SETUP:
-      if (IsKeyPressed(KEY_F1))
-        ScanWifi();
-      break;
-    case CHECKING_UPDATES:
-      CheckRemoteVersion();
-      if (remoteVersion != "Hata" && remoteVersion != localVersion)
-        currentState = DOWNLOADING;
+    case CHECK_UPD:
+      CheckRemote();
+      if (remoteV != "Hata" && remoteV != localV)
+        state = SYNCING;
       else
-        currentState = READY_TO_LAUNCH;
+        state = READY;
       break;
-    case DOWNLOADING: {
-      statusMessage = "Dosyalar indiriliyor ve derleniyor...";
-      // Repo yoksa clone, varsa pull yap
-      if (system("ls .git > /dev/null 2>&1") != 0)
-        system("git clone https://github.com/rglomen/lumanovos.git .");
-      else
-        system("git pull origin main");
-
+    case SYNCING:
+      status = "Sistem Guncelleniyor...";
+      // Dizin kontrolu ve indirme
+      system("rm -rf lumanovos_tmp && git clone "
+             "https://github.com/rglomen/lumanovos.git lumanovos_tmp");
+      system("cp -r lumanovos_tmp/* . && rm -rf lumanovos_tmp");
       system("chmod +x build_all.sh && ./build_all.sh");
-      std::ofstream vOut(".version");
-      vOut << remoteVersion;
-      vOut.close();
-      localVersion = remoteVersion;
-      currentState = READY_TO_LAUNCH;
-      break;
-    }
-    case READY_TO_LAUNCH:
-      statusMessage = "Sistem baslatilmaya hazir.";
-      if (IsKeyPressed(KEY_ENTER)) {
-        system("./main_system &");
-        CloseWindow();
+      {
+        std::ofstream o(".version");
+        o << remoteV;
+        o.close();
       }
+      localV = remoteV;
+      state = READY;
+      break;
+    case WIFI_SET:
+      if (IsKeyPressed(KEY_F1))
+        Scan();
+      break;
+    case READY:
+      status = "LumanovOS Baslatilmaya Hazir";
       break;
     }
 
     BeginDrawing();
-    ClearBackground(appleBg);
+    ClearBackground((Color){245, 245, 247, 255});
     float cx = GetScreenWidth() / 2.0f;
     float cy = GetScreenHeight() / 2.0f;
 
+    // Arka Plan Karti
     DrawRectangleRounded((Rectangle){cx - 300, cy - 180, 600, 360}, 0.05f, 20,
                          WHITE);
     DrawRectangleRoundedLines((Rectangle){cx - 300, cy - 180, 600, 360}, 0.05f,
                               20, (Color){220, 220, 220, 255});
 
-    DrawCircle(cx, cy - 80, 35, appleBlue);
-    DrawText("L", cx - 10, cy - 100, 40, WHITE);
+    // Logo
+    DrawCircle(cx, cy - 80, 35, (Color){0, 122, 255, 255});
+    DrawTextEx(mainFont, "L", (Vector2){cx - 12, cy - 105}, 50, 2, WHITE);
 
-    // Turkce karakter sorununu gecici olarak ASCII ile cozuyoruz (font
-    // yuklenene kadar)
-    DrawText(statusMessage.c_str(),
-             cx - MeasureText(statusMessage.c_str(), 20) / 2, cy + 10, 20,
-             BLACK);
+    // Metinler
+    Vector2 msgSize = MeasureTextEx(mainFont, status.c_str(), 24, 1);
+    DrawTextEx(mainFont, status.c_str(), (Vector2){cx - msgSize.x / 2, cy + 10},
+               24, 1, BLACK);
 
+    // Versiyon Alani
     DrawRectangle(cx - 300, cy + 100, 600, 1, (Color){235, 235, 235, 255});
-    DrawText("Cihaz:", cx - 270, cy + 120, 16, GRAY);
-    DrawText(localVersion.c_str(), cx - 270, cy + 140, 18, BLACK);
-    DrawText("Sunucu:", cx + 120, cy + 120, 16, GRAY);
-    DrawText(remoteVersion.c_str(), cx + 120, cy + 140, 18, appleBlue);
+    DrawTextEx(mainFont, "Yerel:", (Vector2){cx - 270, cy + 120}, 16, 1, GRAY);
+    DrawTextEx(mainFont, localV.c_str(), (Vector2){cx - 270, cy + 140}, 20, 1,
+               BLACK);
+    DrawTextEx(mainFont, "Sunucu:", (Vector2){cx + 120, cy + 120}, 16, 1, GRAY);
+    DrawTextEx(mainFont, remoteV.c_str(), (Vector2){cx + 120, cy + 140}, 20, 1,
+               (Color){0, 122, 255, 255});
 
-    if (currentState == READY_TO_LAUNCH) {
-      DrawRectangleRounded((Rectangle){cx - 100, cy + 40, 200, 40}, 0.5f, 20,
-                           appleBlue);
-      DrawText("SISTEMI BASLAT", cx - MeasureText("SISTEMI BASLAT", 16) / 2,
-               cy + 52, 16, WHITE);
+    if (state == READY) {
+      Rectangle btn = {cx - 120, cy + 45, 240, 45};
+      DrawRectangleRounded(btn, 0.5f, 20, (Color){0, 122, 255, 255});
+      DrawTextEx(mainFont, "SISTEMI BASLAT", (Vector2){cx - 85, cy + 58}, 18, 1,
+                 WHITE);
+      if (IsKeyPressed(KEY_ENTER)) {
+        system("./main_system &");
+        CloseWindow();
+      }
     }
     EndDrawing();
   }
