@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <vector>
 
-
 enum SystemState {
   CHECK_INT,
   WIFI_SET,
@@ -169,9 +168,15 @@ int main() {
         if (hE) {
           // lumanovos klasorunun icindeki binary'yi calistir
           if (access("lumanovos/main_system", F_OK) == 0) {
-            system("cd lumanovos && ./main_system &");
             CloseWindow();
-            return 0;
+            // chdir ile klasöre gir ve execl ile process'i değiştir
+            // Bu sayede X11 oturumu kapanmaz, launcher yerine main_system
+            // çalışır
+            if (chdir("lumanovos") == 0) {
+              execl("./main_system", "./main_system", (char *)NULL);
+            }
+            // execl başarısız olursa buraya ulaşılır
+            return 1;
           } else
             status = "HATA: main_system bulunamadı!";
         }
