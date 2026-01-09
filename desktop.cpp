@@ -110,10 +110,6 @@ float Clamp(float v, float min, float max) {
   return v < min ? min : (v > max ? max : v);
 }
 
-Color ColorAlpha(Color c, float alpha) {
-  return (Color){c.r, c.g, c.b, (unsigned char)(255 * alpha)};
-}
-
 std::vector<std::string> GetDirectoryContents(const std::string &path) {
   std::vector<std::string> items;
   DIR *dir = opendir(path.c_str());
@@ -205,7 +201,7 @@ void DrawWindowFrame(Window &win, Vector2 mouse) {
   for (int i = 0; i < 8; i++) {
     DrawRectangleRounded({bounds.x - i, bounds.y - i, bounds.width + i * 2,
                           bounds.height + i * 2},
-                         0.02f, 10, ColorAlpha(BLACK, 0.03f * (8 - i)));
+                         0.02f, 10, Fade(BLACK, 0.03f * (8 - i)));
   }
 
   // Pencere arka planı
@@ -227,7 +223,7 @@ void DrawWindowFrame(Window &win, Vector2 mouse) {
   Rectangle closeBtn = {btnX - btnR, btnY - btnR, btnR * 2, btnR * 2};
   bool closeHover = CheckCollisionPointRec(mouse, closeBtn);
   DrawCircle(btnX, btnY, btnR,
-             closeHover ? theme->closeBtn : ColorAlpha(theme->closeBtn, 0.7f));
+             closeHover ? theme->closeBtn : Fade(theme->closeBtn, 0.7f));
   if (closeHover)
     DrawText("x", btnX - 3, btnY - 5, 10, WHITE);
 
@@ -237,7 +233,7 @@ void DrawWindowFrame(Window &win, Vector2 mouse) {
   bool minHover = CheckCollisionPointRec(mouse, minBtn);
   DrawCircle(btnX, btnY, btnR,
              minHover ? theme->minimizeBtn
-                      : ColorAlpha(theme->minimizeBtn, 0.7f));
+                      : Fade(theme->minimizeBtn, 0.7f));
   if (minHover)
     DrawText("-", btnX - 2, btnY - 6, 12, WHITE);
 
@@ -247,7 +243,7 @@ void DrawWindowFrame(Window &win, Vector2 mouse) {
   bool maxHover = CheckCollisionPointRec(mouse, maxBtn);
   DrawCircle(btnX, btnY, btnR,
              maxHover ? theme->maximizeBtn
-                      : ColorAlpha(theme->maximizeBtn, 0.7f));
+                      : Fade(theme->maximizeBtn, 0.7f));
   if (maxHover)
     DrawText("+", btnX - 3, btnY - 5, 10, WHITE);
 
@@ -299,7 +295,7 @@ void DrawFileManager(Window &win, Vector2 mouse) {
     bool hover = CheckCollisionPointRec(mouse, itemRect);
 
     if (hover) {
-      DrawRectangleRounded(itemRect, 0.2f, 8, ColorAlpha(theme->accent, 0.2f));
+      DrawRectangleRounded(itemRect, 0.2f, 8, Fade(theme->accent, 0.2f));
 
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         std::string item = win.fileList[i];
@@ -457,7 +453,7 @@ void DrawUpdater(Window &win, Vector2 mouse) {
   Rectangle checkBtn = {cx - 100, cy, 200, 40};
   bool checkHover = CheckCollisionPointRec(mouse, checkBtn);
   DrawRectangleRounded(checkBtn, 0.3f, 10,
-                       checkHover ? ColorAlpha(theme->accent, 0.8f)
+                       checkHover ? Fade(theme->accent, 0.8f)
                                   : theme->accent);
   DrawText("Guncelleme Kontrol Et", checkBtn.x + 20, checkBtn.y + 12, 14,
            WHITE);
@@ -473,7 +469,7 @@ void DrawUpdater(Window &win, Vector2 mouse) {
   Rectangle restartBtn = {cx - 100, cy, 200, 40};
   bool restartHover = CheckCollisionPointRec(mouse, restartBtn);
   DrawRectangleRounded(restartBtn, 0.3f, 10,
-                       restartHover ? ColorAlpha(theme->minimizeBtn, 0.8f)
+                       restartHover ? Fade(theme->minimizeBtn, 0.8f)
                                     : theme->minimizeBtn);
   DrawText("Sistemi Yeniden Baslat", restartBtn.x + 15, restartBtn.y + 12, 14,
            BLACK);
@@ -487,7 +483,7 @@ void DrawUpdater(Window &win, Vector2 mouse) {
   Rectangle shutdownBtn = {cx - 100, cy, 200, 40};
   bool shutdownHover = CheckCollisionPointRec(mouse, shutdownBtn);
   DrawRectangleRounded(shutdownBtn, 0.3f, 10,
-                       shutdownHover ? ColorAlpha(theme->closeBtn, 0.8f)
+                       shutdownHover ? Fade(theme->closeBtn, 0.8f)
                                      : theme->closeBtn);
   DrawText("Sistemi Kapat", shutdownBtn.x + 45, shutdownBtn.y + 12, 14, WHITE);
 
@@ -612,8 +608,8 @@ void DrawTopBar(Vector2 mouse) {
 
   // Bar arka planı
   DrawRectangle(0, 0, w, 32, theme->topBar);
-  DrawRectangleGradientV(0, 32, w, 3, ColorAlpha(BLACK, 0.1f),
-                         ColorAlpha(BLACK, 0));
+  DrawRectangleGradientV(0, 32, w, 3, Fade(BLACK, 0.1f),
+                         Fade(BLACK, 0));
 
   // Logo
   DrawText("LumanovOS", 15, 8, 16, theme->text);
@@ -629,8 +625,8 @@ void DrawTopBar(Vector2 mouse) {
   Rectangle sysBtn = {(float)w - 90, 4, 25, 24};
   bool sysHover = CheckCollisionPointRec(mouse, sysBtn);
   DrawRectangleRounded(sysBtn, 0.3f, 8,
-                       sysHover ? ColorAlpha(theme->accent, 0.3f)
-                                : ColorAlpha(WHITE, 0));
+                       sysHover ? Fade(theme->accent, 0.3f)
+                                : Fade(WHITE, 0));
   DrawText("S", sysBtn.x + 8, sysBtn.y + 5, 14, theme->text);
 
   if (sysHover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -652,7 +648,7 @@ void DrawTopBar(Vector2 mouse) {
       bool hover = CheckCollisionPointRec(mouse, item);
 
       if (hover) {
-        DrawRectangleRounded(item, 0.2f, 8, ColorAlpha(colors[i], 0.2f));
+        DrawRectangleRounded(item, 0.2f, 8, Fade(colors[i], 0.2f));
       }
 
       DrawCircle(item.x + 15, item.y + 16, 5, colors[i]);
@@ -712,7 +708,7 @@ void DrawDock(Vector2 mouse) {
       bool hover = CheckCollisionPointRec(mouse, minRect);
 
       DrawRectangleRounded(minRect, 0.2f, 8,
-                           hover ? ColorAlpha(theme->accent, 0.5f)
+                           hover ? Fade(theme->accent, 0.5f)
                                  : theme->border);
       DrawText(win.title.substr(0, 1).c_str(), minX + 14, dockY + 20, 16,
                theme->text);
@@ -747,7 +743,7 @@ void DrawDock(Vector2 mouse) {
       int tw = MeasureText(dockApps[i].name, 12);
       DrawRectangleRounded(
           {iconX + 22 - tw / 2.0f - 6, dockY - 28, (float)tw + 12, 20}, 0.4f, 8,
-          ColorAlpha(BLACK, 0.8f));
+          Fade(BLACK, 0.8f));
       DrawText(dockApps[i].name, iconX + 22 - tw / 2.0f, dockY - 25, 12, WHITE);
     }
 
@@ -789,7 +785,7 @@ void DrawCustomCursor(Vector2 pos) {
 
   // Gölge
   DrawTriangle({p1.x + 2, p1.y + 2}, {p2.x + 2, p2.y + 2}, {p3.x + 2, p3.y + 2},
-               ColorAlpha(BLACK, 0.3f));
+               Fade(BLACK, 0.3f));
 
   // İmleç
   DrawTriangle(p1, p2, p3, WHITE);
@@ -884,11 +880,11 @@ int main() {
       float cy = GetScreenHeight() / 2.0f - 50;
 
       DrawRectangleRounded({cx - 180, cy - 40, 360, 80}, 0.1f, 15,
-                           ColorAlpha(theme->windowBg, alpha));
+                           Fade(theme->windowBg, alpha));
 
       const char *msg = "LumanovOS'a Hosgeldiniz!";
       int msgW = MeasureText(msg, 22);
-      DrawText(msg, cx - msgW / 2, cy - 10, 22, ColorAlpha(theme->text, alpha));
+      DrawText(msg, cx - msgW / 2, cy - 10, 22, Fade(theme->text, alpha));
     }
 
     // Mouse imleci (en son)
