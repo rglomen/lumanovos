@@ -5,102 +5,81 @@
 #include <iostream>
 #include <cstdio>
 #include <memory>
-#include <stdexcept>
+#include <dirent.h> // Dosya yöneticisi için
 
-// Sistem komutlarını çalıştırıp çıktısını alan yardımcı fonksiyon
+// Sistem komutu çıktı yakalayıcı
 std::string Exec(const char* cmd) {
     char buffer[128];
     std::string result = "";
     std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
     if (!pipe) return "Hata!";
-    while (fgets(buffer, sizeof(buffer), pipe.get()) != nullptr) {
-        result += buffer;
-    }
+    while (fgets(buffer, sizeof(buffer), pipe.get()) != nullptr) result += buffer;
     return result;
 }
 
 int main() {
     const int screenWidth = 1280;
     const int screenHeight = 720;
-    InitWindow(screenWidth, screenHeight, "Lumanovos OS - Full Pro Console");
+    InitWindow(screenWidth, screenHeight, "Lumanovos Pro OS");
     SetTargetFPS(60);
 
-    // Menü Verileri
-    std::vector<std::string> cats = {"OYUNLAR", "DOSYALAR", "AG", "AYARLAR", "GUC"};
+    std::vector<std::string> cats = {"DOSYALAR", "AG AYARLARI", "DONANIM", "GUC"};
     int currentCat = 0;
     int currentItem = 0;
-    
-    // Alt Menüler
-    std::vector<std::vector<std::string>> items = {
-        {"Retro Arch", "Lumanovos Arcade", "Cloud Gaming"},
-        {"Dahili Depolama", "USB Sürücü", "Medya Klasörü"},
-        {"Wi-Fi Tara", "IP Bilgisi", "Baglanti Kes"},
-        {"Ses Seviyesi", "Mikrofon Durumu", "Sistem Bilgisi", "Cozunurluk"},
-        {"Yeniden Baslat", "Sistemi Kapat"}
-    };
+    std::string statusMsg = "Lumanovos OS Hazir";
 
-    std::string statusMsg = "Sistem Hazır";
-    float waveOffset = 0.0f;
+    // Dosya listesi için değişkenler
+    std::vector<std::string> fileList;
 
     while (!WindowShouldClose()) {
         // --- INPUT ---
         if (IsKeyPressed(KEY_RIGHT)) { currentCat = (currentCat + 1) % cats.size(); currentItem = 0; }
         if (IsKeyPressed(KEY_LEFT)) { currentCat = (currentCat - 1 + cats.size()) % cats.size(); currentItem = 0; }
-        if (IsKeyPressed(KEY_DOWN)) { currentItem = (currentItem + 1) % items[currentCat].size(); }
-        if (IsKeyPressed(KEY_UP)) { currentItem = (currentItem - 1 + items[currentCat].size()) % items[currentCat].size(); }
-
+        
+        // --- AKSİYONLAR ---
         if (IsKeyPressed(KEY_ENTER)) {
-            std::string selection = items[currentCat][currentItem];
-            
-            // DONANIM KONTROLLERİ
-            if (selection == "Ses Seviyesi") {
-                statusMsg = "Ses: " + Exec("amixer get Master | grep -o '[0-9]*%' | head -1");
+            if (cats[currentCat] == "DOSYALAR") {
+                fileList.clear();
+                DIR *dir; struct dirent *ent;
+                if ((dir = opendir("/home/lomen")) != NULL) {
+                    while ((ent = readdir(dir)) != NULL) fileList.push_back(ent->d_name);
+                    closedir(dir);
+                }
+                statusMsg = "Dosyalar Listelendi";
             }
-            else if (selection == "IP Bilgisi") {
-                statusMsg = "IP: " + Exec("hostname -I | awk '{print $1}'");
+            if (cats[currentCat] == "AG AYARLARI") {
+                statusMsg = "Taraniyor... IP: " + Exec("hostname -I");
             }
-            else if (selection == "Dahili Depolama") {
+            if (cats[currentCat] == "DONANIM") {
                 statusMsg = "Disk: " + Exec("df -h / | awk 'NR==2 {print $4}'") + " Bos";
             }
-            else if (selection == "Sistem Bilgisi") {
-                statusMsg = Exec("uname -sr");
-            }
-            else if (selection == "Sistemi Kapat") { system("sudo poweroff"); }
+            if (cats[currentCat] == "GUC") system("sudo reboot");
         }
-
-        waveOffset += GetFrameTime() * 2.0f;
 
         // --- DRAW ---
         BeginDrawing();
-            ClearBackground({18, 18, 28, 255});
-
-            // Gelişmiş Arka Plan Dalgası
-            for (int i = 0; i < screenWidth; i += 2) {
-                float y1 = sin(waveOffset + i * 0.005f) * 40.0f + (screenHeight / 2.0f);
-                float y2 = cos(waveOffset * 0.5f + i * 0.008f) * 20.0f + (screenHeight / 2.0f + 10);
-                DrawPixel(i, (int)y1, {0, 150, 255, 100});
-                DrawPixel(i, (int)y2, {0, 255, 200, 50});
-            }
-
-            // Kategoriler (Üst Menü)
+            ClearBackground({15, 15, 25, 255});
+            
+            // Üst Menü
             for (int i = 0; i < cats.size(); i++) {
-                Color c = (i == currentCat) ? WHITE : DARKGRAY;
-                DrawText(cats[i].c_str(), 100 + (i * 220), 80, 25, c);
-                if (i == currentCat) DrawRectangle(100 + (i * 220), 115, 100, 3, {0, 255, 150, 255});
+                DrawText(cats[i].c_str(), 50 + (i * 250), 50, 25, (i == currentCat) ? GREEN : GRAY);
             }
 
-            // Öğeler (Dikey Liste)
-            for (int j = 0; j < items[currentCat].size(); j++) {
-                Color c = (j == currentItem) ? {0, 255, 150, 255} : LIGHTGRAY;
-                std::string label = (j == currentItem) ? "> " + items[currentCat][j] : "  " + items[currentCat][j];
-                DrawText(label.c_str(), 120, 220 + (j * 50), 30, c);
+            // İçerik Alanı
+            DrawRectangleLines(50, 120, 1180, 500, DARKGRAY);
+            
+            if (cats[currentCat] == "DOSYALAR" && !fileList.empty()) {
+                for(int i=0; i<fmin(fileList.size(), 10); i++) {
+                    DrawText(fileList[i].c_str(), 80, 150 + (i*35), 20, LIGHTGRAY);
+                }
+            } else {
+                DrawText("Secmek ve Calistirmak icin ENTER'a basin", 400, 300, 20, GRAY);
             }
 
-            // Alt Durum Çubuğu (PlayStation Tarzı Bildirim Alanı)
-            DrawRectangle(0, screenHeight - 60, screenWidth, 60, {30, 30, 45, 255});
-            DrawText(statusMsg.c_str(), 30, screenHeight - 40, 20, GREEN);
-            DrawText(Exec("date +%H:%M").c_str(), screenWidth - 100, screenHeight - 40, 20, WHITE);
-
+            // Alt Bilgi Barı
+            DrawRectangle(0, 660, 1280, 60, {30, 30, 45, 255});
+            DrawText(statusMsg.c_str(), 20, 680, 20, GREEN);
+            
         EndDrawing();
     }
     CloseWindow();
