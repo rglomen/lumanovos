@@ -67,7 +67,15 @@ bool isDarkTheme = true;
 // PENCERE SİSTEMİ
 // ============================================================================
 enum WindowState { WIN_NORMAL, WIN_MINIMIZED, WIN_MAXIMIZED };
-enum AppType { APP_NONE, APP_FILES, APP_SETTINGS, APP_TERMINAL, APP_UPDATER };
+enum AppType {
+  APP_NONE,
+  APP_FILES,
+  APP_SETTINGS,
+  APP_TERMINAL,
+  APP_UPDATER,
+  APP_NOTEPAD,
+  APP_BROWSER
+};
 
 struct Window {
   int id;
@@ -88,6 +96,19 @@ struct Window {
   int scrollOffset;
   std::string terminalOutput;
   std::string terminalInput;
+
+  // Notepad için
+  std::string notepadFilePath;
+  std::vector<std::string> notepadLines;
+  int notepadCursorLine;
+  int notepadCursorCol;
+  bool notepadModified;
+  int notepadScrollY;
+
+  // Browser için
+  std::string browserUrl;
+  std::string browserContent;
+  bool browserLoading;
 };
 
 std::vector<Window> windows;
@@ -789,6 +810,349 @@ void DrawUpdater(Window &win, Vector2 mouse) {
   }
 }
 
+// ============================================================================
+// NOTEPAD UYGULAMASI
+// ============================================================================
+void LoadTextFile(Window &win, const std::string &path) {
+  win.notepadFilePath = path;
+  win.notepadLines.clear();
+  win.notepadModified = false;
+
+  std::ifstream file(path);
+  if (file.is_open()) {
+    std::string line;
+    while (std::getline(file, line)) {
+      win.notepadLines.push_back(line);
+    }
+    file.close();
+  }
+  if (win.notepadLines.empty()) {
+    win.notepadLines.push_back("");
+  }
+  win.notepadCursorLine = 0;
+  win.notepadCursorCol = 0;
+  win.notepadScrollY = 0;
+
+  // Pencere başlığını güncelle
+  size_t pos = path.find_last_of('/');
+  std::string filename =
+      (pos != std::string::npos) ? path.substr(pos + 1) : path;
+  win.title = "Notepad - " + filename;
+}
+
+void SaveTextFile(Window &win) {
+  if (win.notepadFilePath.empty())
+    return;
+
+  std::ofstream file(win.notepadFilePath);
+  if (file.is_open()) {
+    for (size_t i = 0; i < win.notepadLines.size(); i++) {
+      file << win.notepadLines[i];
+      if (i < win.notepadLines.size() - 1)
+        file << "\n";
+    }
+    file.close();
+    win.notepadModified = false;
+  }
+}
+
+void DrawNotepad(Window &win, Vector2 mouse) {
+  Rectangle content = {win.bounds.x + 5, win.bounds.y + 40,
+                       win.bounds.width - 10, win.bounds.height - 50};
+
+  // Toolbar
+  float toolY = content.y;
+  Rectangle newBtn = {content.x, toolY, 60, 25};
+  Rectangle openBtn = {content.x + 65, toolY, 60, 25};
+  Rectangle saveBtn = {content.x + 130, toolY, 60, 25};
+
+  bool newHover = CheckCollisionPointRec(mouse, newBtn);
+  bool openHover = CheckCollisionPointRec(mouse, openBtn);
+  bool saveHover = CheckCollisionPointRec(mouse, saveBtn);
+
+  DrawRectangleRounded(newBtn, 0.3f, 8,
+                       newHover ? theme->accent : theme->border);
+  DrawText("Yeni", newBtn.x + 12, newBtn.y + 5, 13,
+           newHover ? WHITE : theme->text);
+
+  DrawRectangleRounded(openBtn, 0.3f, 8,
+                       openHover ? theme->accent : theme->border);
+  DrawText("Ac", openBtn.x + 20, openBtn.y + 5, 13,
+           openHover ? WHITE : theme->text);
+
+  Color saveBtnColor =
+      win.notepadModified ? (Color){255, 149, 0, 255} : theme->border;
+  DrawRectangleRounded(saveBtn, 0.3f, 8,
+                       saveHover ? theme->accent : saveBtnColor);
+  DrawText("Kaydet", saveBtn.x + 5, saveBtn.y + 5, 13,
+           saveHover ? WHITE : theme->text);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (newHover) {
+      win.notepadLines.clear();
+      win.notepadLines.push_back("");
+      win.notepadFilePath = "";
+      win.notepadCursorLine = 0;
+      win.notepadCursorCol = 0;
+      win.notepadModified = false;
+      win.title = "Notepad - Yeni Dosya";
+    }
+    if (saveHover && !win.notepadFilePath.empty()) {
+      SaveTextFile(win);
+    }
+  }
+
+  // Dosya yolu göstergesi
+  DrawText(win.notepadFilePath.empty() ? "Yeni Dosya"
+                                       : win.notepadFilePath.c_str(),
+           content.x + 200, toolY + 6, 11, theme->textDim);
+
+  // Metin alanı
+  Rectangle textArea = {content.x, content.y + 30, content.width,
+                        content.height - 35};
+  DrawRectangleRounded(textArea, 0.02f, 8, isDarkTheme ? BLACK : WHITE);
+
+  float lineH = 18;
+  float lineNumW = 35;
+  int visibleLines = (textArea.height - 10) / lineH;
+
+  // Scroll kontrolü
+  if (CheckCollisionPointRec(mouse, textArea)) {
+    int wheel = GetMouseWheelMove();
+    win.notepadScrollY -= wheel * 3;
+    win.notepadScrollY =
+        Clamp(win.notepadScrollY, 0,
+              std::max(0, (int)win.notepadLines.size() - visibleLines + 1));
+  }
+
+  // Satırları çiz
+  for (int i = 0; i < visibleLines &&
+                  (i + win.notepadScrollY) < (int)win.notepadLines.size();
+       i++) {
+    int lineIdx = i + win.notepadScrollY;
+    float y = textArea.y + 5 + i * lineH;
+
+    // Satır numarası
+    DrawText(TextFormat("%3d", lineIdx + 1), textArea.x + 3, y, 12,
+             theme->textDim);
+
+    // Ayırıcı çizgi
+    DrawLine(textArea.x + lineNumW, y, textArea.x + lineNumW, y + lineH,
+             theme->border);
+
+    // Aktif satır vurgusu
+    if (lineIdx == win.notepadCursorLine) {
+      DrawRectangle(textArea.x + lineNumW + 2, y, textArea.width - lineNumW - 5,
+                    lineH, Fade(theme->accent, 0.1f));
+    }
+
+    // Metin
+    std::string &line = win.notepadLines[lineIdx];
+    DrawText(line.c_str(), textArea.x + lineNumW + 5, y + 2, 13,
+             isDarkTheme ? WHITE : BLACK);
+
+    // İmleç
+    if (lineIdx == win.notepadCursorLine && (int)(GetTime() * 2) % 2 == 0) {
+      int cursorX =
+          textArea.x + lineNumW + 5 +
+          MeasureText(line.substr(0, win.notepadCursorCol).c_str(), 13);
+      DrawRectangle(cursorX, y + 2, 2, 14, theme->accent);
+    }
+  }
+
+  // Metin alanına tıklama - satır seçimi
+  if (CheckCollisionPointRec(mouse, textArea) &&
+      IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    int clickedLine = (mouse.y - textArea.y - 5) / lineH + win.notepadScrollY;
+    if (clickedLine >= 0 && clickedLine < (int)win.notepadLines.size()) {
+      win.notepadCursorLine = clickedLine;
+      // Sütun pozisyonunu hesapla (yaklaşık)
+      win.notepadCursorCol =
+          std::min((int)win.notepadLines[clickedLine].length(),
+                   (int)((mouse.x - textArea.x - lineNumW - 5) / 7));
+    }
+  }
+
+  // Klavye girişi
+  if (win.id == activeWindowId) {
+    // Karakter girişi
+    int key = GetCharPressed();
+    while (key > 0) {
+      if (key >= 32 && key <= 126) {
+        std::string &line = win.notepadLines[win.notepadCursorLine];
+        line.insert(win.notepadCursorCol, 1, (char)key);
+        win.notepadCursorCol++;
+        win.notepadModified = true;
+      }
+      key = GetCharPressed();
+    }
+
+    // Özel tuşlar
+    if (IsKeyPressed(KEY_ENTER)) {
+      std::string &line = win.notepadLines[win.notepadCursorLine];
+      std::string newLine = line.substr(win.notepadCursorCol);
+      line = line.substr(0, win.notepadCursorCol);
+      win.notepadLines.insert(
+          win.notepadLines.begin() + win.notepadCursorLine + 1, newLine);
+      win.notepadCursorLine++;
+      win.notepadCursorCol = 0;
+      win.notepadModified = true;
+    }
+
+    if (IsKeyPressed(KEY_BACKSPACE)) {
+      if (win.notepadCursorCol > 0) {
+        std::string &line = win.notepadLines[win.notepadCursorLine];
+        line.erase(win.notepadCursorCol - 1, 1);
+        win.notepadCursorCol--;
+        win.notepadModified = true;
+      } else if (win.notepadCursorLine > 0) {
+        std::string &prevLine = win.notepadLines[win.notepadCursorLine - 1];
+        win.notepadCursorCol = prevLine.length();
+        prevLine += win.notepadLines[win.notepadCursorLine];
+        win.notepadLines.erase(win.notepadLines.begin() +
+                               win.notepadCursorLine);
+        win.notepadCursorLine--;
+        win.notepadModified = true;
+      }
+    }
+
+    if (IsKeyPressed(KEY_LEFT) && win.notepadCursorCol > 0)
+      win.notepadCursorCol--;
+    if (IsKeyPressed(KEY_RIGHT)) {
+      if (win.notepadCursorCol <
+          (int)win.notepadLines[win.notepadCursorLine].length())
+        win.notepadCursorCol++;
+    }
+    if (IsKeyPressed(KEY_UP) && win.notepadCursorLine > 0) {
+      win.notepadCursorLine--;
+      win.notepadCursorCol =
+          std::min(win.notepadCursorCol,
+                   (int)win.notepadLines[win.notepadCursorLine].length());
+    }
+    if (IsKeyPressed(KEY_DOWN) &&
+        win.notepadCursorLine < (int)win.notepadLines.size() - 1) {
+      win.notepadCursorLine++;
+      win.notepadCursorCol =
+          std::min(win.notepadCursorCol,
+                   (int)win.notepadLines[win.notepadCursorLine].length());
+    }
+
+    // Ctrl+S kaydet
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S)) {
+      if (!win.notepadFilePath.empty())
+        SaveTextFile(win);
+    }
+  }
+
+  // Durum çubuğu
+  DrawText(TextFormat("Satir: %d  Sutun: %d  %s", win.notepadCursorLine + 1,
+                      win.notepadCursorCol + 1,
+                      win.notepadModified ? "[Degistirildi]" : ""),
+           textArea.x + 5, textArea.y + textArea.height - 18, 11,
+           theme->textDim);
+}
+
+// ============================================================================
+// BROWSER UYGULAMASI
+// ============================================================================
+void DrawBrowser(Window &win, Vector2 mouse) {
+  Rectangle content = {win.bounds.x + 5, win.bounds.y + 40,
+                       win.bounds.width - 10, win.bounds.height - 50};
+
+  // URL Bar
+  Rectangle urlBar = {content.x, content.y, content.width - 70, 30};
+  Rectangle goBtn = {content.x + content.width - 65, content.y, 60, 30};
+
+  DrawRectangleRounded(urlBar, 0.3f, 8, isDarkTheme ? BLACK : WHITE);
+  DrawRectangleRoundedLines(urlBar, 0.3f, 8, theme->border);
+
+  // URL metni
+  DrawText(win.browserUrl.c_str(), urlBar.x + 10, urlBar.y + 8, 13,
+           isDarkTheme ? WHITE : BLACK);
+
+  // İmleç
+  if (win.id == activeWindowId && (int)(GetTime() * 2) % 2 == 0) {
+    int cursorX = urlBar.x + 10 + MeasureText(win.browserUrl.c_str(), 13);
+    DrawRectangle(cursorX, urlBar.y + 6, 2, 18, theme->accent);
+  }
+
+  // Git butonu
+  bool goHover = CheckCollisionPointRec(mouse, goBtn);
+  DrawRectangleRounded(goBtn, 0.3f, 8, goHover ? theme->accent : theme->border);
+  DrawText("Git", goBtn.x + 18, goBtn.y + 8, 13, goHover ? WHITE : theme->text);
+
+  // Hızlı linkler
+  float y = content.y + 40;
+  DrawText("Hizli Erisim:", content.x, y, 14, theme->textDim);
+  y += 25;
+
+  const char *quickLinks[][2] = {
+      {"Google", "https://www.google.com"},
+      {"YouTube", "https://www.youtube.com"},
+      {"GitHub", "https://www.github.com"},
+      {"Wikipedia", "https://www.wikipedia.org"},
+  };
+
+  for (int i = 0; i < 4; i++) {
+    Rectangle linkBtn = {content.x + (i % 2) * 120, y + (i / 2) * 35, 110, 30};
+    bool hover = CheckCollisionPointRec(mouse, linkBtn);
+
+    DrawRectangleRounded(linkBtn, 0.3f, 8,
+                         hover ? Fade(theme->accent, 0.3f) : theme->border);
+    DrawText(quickLinks[i][0], linkBtn.x + 10, linkBtn.y + 8, 13,
+             hover ? theme->accent : theme->text);
+
+    if (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      std::string cmd = "firefox '" + std::string(quickLinks[i][1]) + "' &";
+      system(cmd.c_str());
+    }
+  }
+
+  y += 80;
+
+  // Bilgi
+  DrawRectangle(content.x, y, content.width, 1, theme->border);
+  y += 15;
+
+  DrawText("LumanovOS Web Tarayici", content.x, y, 16, theme->text);
+  y += 25;
+  DrawText("URL girin ve 'Git' butonuna basin veya", content.x, y, 12,
+           theme->textDim);
+  y += 18;
+  DrawText("hizli erisim butonlarindan birini secin.", content.x, y, 12,
+           theme->textDim);
+  y += 25;
+  DrawText("Harici tarayici (Firefox) acilacaktir.", content.x, y, 12,
+           theme->textDim);
+
+  // URL girişi
+  if (win.id == activeWindowId) {
+    int key = GetCharPressed();
+    while (key > 0) {
+      if (key >= 32 && key <= 126) {
+        win.browserUrl += (char)key;
+      }
+      key = GetCharPressed();
+    }
+
+    if (IsKeyPressed(KEY_BACKSPACE) && !win.browserUrl.empty()) {
+      win.browserUrl.pop_back();
+    }
+
+    if (IsKeyPressed(KEY_ENTER) ||
+        (goHover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))) {
+      if (!win.browserUrl.empty()) {
+        std::string url = win.browserUrl;
+        if (url.find("http") == std::string::npos) {
+          url = "https://" + url;
+        }
+        std::string cmd = "firefox '" + url + "' &";
+        system(cmd.c_str());
+      }
+    }
+  }
+}
+
 void DrawWindowContent(Window &win, Vector2 mouse) {
   switch (win.appType) {
   case APP_FILES:
@@ -802,6 +1166,12 @@ void DrawWindowContent(Window &win, Vector2 mouse) {
     break;
   case APP_UPDATER:
     DrawUpdater(win, mouse);
+    break;
+  case APP_NOTEPAD:
+    DrawNotepad(win, mouse);
+    break;
+  case APP_BROWSER:
+    DrawBrowser(win, mouse);
     break;
   default:
     break;
@@ -975,12 +1345,14 @@ struct DockApp {
 
 DockApp dockApps[] = {
     {"Dosyalar", "D", APP_FILES, {0, 122, 255, 255}},
-    {"Ayarlar", "A", APP_SETTINGS, {142, 142, 147, 255}},
+    {"Notepad", "N", APP_NOTEPAD, {255, 204, 0, 255}},
+    {"Tarayici", "W", APP_BROWSER, {255, 87, 51, 255}},
     {"Terminal", ">", APP_TERMINAL, {40, 40, 45, 255}},
+    {"Ayarlar", "A", APP_SETTINGS, {142, 142, 147, 255}},
     {"Guncelleme", "G", APP_UPDATER, {40, 200, 64, 255}},
 };
-int dockAppCount = 4;
-float dockHoverAnim[4] = {0, 0, 0, 0};
+int dockAppCount = 6;
+float dockHoverAnim[6] = {0, 0, 0, 0, 0, 0};
 
 void DrawDock(Vector2 mouse) {
   int w = GetScreenWidth();
@@ -1054,9 +1426,18 @@ void DrawDock(Vector2 mouse) {
         }
       }
       if (!exists) {
-        // Ayarlar için daha büyük pencere
-        float winW = (dockApps[i].appType == APP_SETTINGS) ? 550 : 450;
-        float winH = (dockApps[i].appType == APP_SETTINGS) ? 450 : 350;
+        // Uygulamaya göre pencere boyutu
+        float winW = 450, winH = 350;
+        if (dockApps[i].appType == APP_SETTINGS) {
+          winW = 550;
+          winH = 450;
+        } else if (dockApps[i].appType == APP_NOTEPAD) {
+          winW = 600;
+          winH = 450;
+        } else if (dockApps[i].appType == APP_BROWSER) {
+          winW = 500;
+          winH = 400;
+        }
         CreateWindow(dockApps[i].name, dockApps[i].appType, 100 + i * 30,
                      80 + i * 30, winW, winH);
       }
