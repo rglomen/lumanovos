@@ -20,7 +20,7 @@ SystemState state = CHECK_INT;
 std::string localV = "0.0.0";
 std::string remoteV = "---";
 std::vector<Wifi> networks;
-std::string status = "Sistem Kontrol Ediliyor...";
+std::string status = "Sistem Hazırlanıyor...";
 
 bool HasConnection() {
   return (system("ping -c 1 8.8.8.8 > /dev/null 2>&1") == 0);
@@ -32,11 +32,11 @@ void LoadLocal() {
     f >> localV;
     f.close();
   } else
-    localV = "Yok";
+    localV = "Bulunmadı";
 }
 
 void Scan() {
-  status = "Aglar Taraniyor...";
+  status = "Ağlar Taranıyor...";
   networks.clear();
   system("nmcli -t -f SSID,SIGNAL dev wifi > wl.txt");
   std::ifstream f("wl.txt");
@@ -52,7 +52,7 @@ void Scan() {
 }
 
 void CheckRemote() {
-  status = "Guncelleme Denetleniyor...";
+  status = "Güncelleme Denetleniyor...";
   system("curl -s --max-time 5 "
          "https://raw.githubusercontent.com/rglomen/lumanovos/main/version.txt "
          "> rv.txt");
@@ -67,24 +67,25 @@ void CheckRemote() {
 }
 
 int main() {
-  // MiniOS/Trixy icinde daha temiz goruntu icin
-  SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
-  InitWindow(GetScreenWidth(), GetScreenHeight(), "LumanovOS Setup");
+  // Dark Mode ve Premium Gorunum Ayarlari
+  SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
+  InitWindow(GetScreenWidth(), GetScreenHeight(), "LumanovOS Welcome");
   SetTargetFPS(60);
   LoadLocal();
 
-  // Font Ayari - Eger sistemde varsa yukle, yoksa default kullan
-  Font mainFont = GetFontDefault();
-  if (access("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-             F_OK) == 0) {
-    mainFont = LoadFontEx(
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 32,
-        0, 250);
-  }
+  // Renk Paleti (Dark Mode)
+  Color bgDark = (Color){10, 10, 12, 255};      // Çok koyu arka plan
+  Color cardDark = (Color){25, 25, 30, 255};    // Kart rengi
+  Color accentBlue = (Color){0, 122, 255, 255}; // Apple Blue
+  Color accentRed = (Color){255, 59, 48, 255};  // Apple Red
+  Color textMain = WHITE;
+  Color textGray = (Color){142, 142, 147, 255};
 
   int timer = 0;
   while (!WindowShouldClose()) {
     timer++;
+
+    // --- LOGIC ---
     switch (state) {
     case CHECK_INT:
       if (timer > 60) {
@@ -104,8 +105,7 @@ int main() {
         state = READY;
       break;
     case SYNCING:
-      status = "Sistem Guncelleniyor...";
-      // Dizin kontrolu ve indirme
+      status = "LumanovOS Dosyaları Senkronize Ediliyor...";
       system("rm -rf lumanovos_tmp && git clone "
              "https://github.com/rglomen/lumanovos.git lumanovos_tmp");
       system("cp -r lumanovos_tmp/* . && rm -rf lumanovos_tmp");
@@ -123,49 +123,79 @@ int main() {
         Scan();
       break;
     case READY:
-      status = "LumanovOS Baslatilmaya Hazir";
+      status = "LumanovOS Kullanıma Hazır";
       break;
     }
 
+    // --- DRAW ---
     BeginDrawing();
-    ClearBackground((Color){245, 245, 247, 255});
+    ClearBackground(bgDark);
     float cx = GetScreenWidth() / 2.0f;
     float cy = GetScreenHeight() / 2.0f;
 
-    // Arka Plan Karti
-    DrawRectangleRounded((Rectangle){cx - 300, cy - 180, 600, 360}, 0.05f, 20,
-                         WHITE);
-    DrawRectangleRoundedLines((Rectangle){cx - 300, cy - 180, 600, 360}, 0.05f,
-                              20, (Color){220, 220, 220, 255});
+    // Arka Plan Kartı
+    DrawRectangleRounded((Rectangle){cx - 320, cy - 200, 640, 400}, 0.05f, 20,
+                         cardDark);
+    DrawRectangleRoundedLines((Rectangle){cx - 320, cy - 200, 640, 400}, 0.05f,
+                              20, (Color){60, 60, 65, 255});
 
-    // Logo
-    DrawCircle(cx, cy - 80, 35, (Color){0, 122, 255, 255});
-    DrawTextEx(mainFont, "L", (Vector2){cx - 12, cy - 105}, 50, 2, WHITE);
+    // Logo Üstte
+    DrawCircleGradient(cx, cy - 100, 45, accentBlue, (Color){0, 80, 200, 255});
+    DrawText("L", cx - 12, cy - 122, 50, WHITE);
 
-    // Metinler
-    Vector2 msgSize = MeasureTextEx(mainFont, status.c_str(), 24, 1);
-    DrawTextEx(mainFont, status.c_str(), (Vector2){cx - msgSize.x / 2, cy + 10},
-               24, 1, BLACK);
+    // Durum Mesajı
+    DrawText(status.c_str(), cx - MeasureText(status.c_str(), 22) / 2, cy - 20,
+             22, textMain);
 
-    // Versiyon Alani
-    DrawRectangle(cx - 300, cy + 100, 600, 1, (Color){235, 235, 235, 255});
-    DrawTextEx(mainFont, "Yerel:", (Vector2){cx - 270, cy + 120}, 16, 1, GRAY);
-    DrawTextEx(mainFont, localV.c_str(), (Vector2){cx - 270, cy + 140}, 20, 1,
-               BLACK);
-    DrawTextEx(mainFont, "Sunucu:", (Vector2){cx + 120, cy + 120}, 16, 1, GRAY);
-    DrawTextEx(mainFont, remoteV.c_str(), (Vector2){cx + 120, cy + 140}, 20, 1,
-               (Color){0, 122, 255, 255});
+    // Alt Bilgi Alanı
+    DrawRectangle(cx - 320, cy + 100, 640, 1, (Color){50, 50, 55, 255});
+    DrawText("Sürüm:", cx - 290, cy + 120, 16, textGray);
+    DrawText(localV.c_str(), cx - 290, cy + 140, 18, textMain);
+    DrawText("Sunucu:", cx + 180, cy + 120, 16, textGray);
+    DrawText(remoteV.c_str(), cx + 180, cy + 140, 18, accentBlue);
 
+    // Butonlar (FAZ 2: Mouse Desteği)
     if (state == READY) {
-      Rectangle btn = {cx - 120, cy + 45, 240, 45};
-      DrawRectangleRounded(btn, 0.5f, 20, (Color){0, 122, 255, 255});
-      DrawTextEx(mainFont, "SISTEMI BASLAT", (Vector2){cx - 85, cy + 58}, 18, 1,
-                 WHITE);
-      if (IsKeyPressed(KEY_ENTER)) {
-        system("./main_system &");
-        CloseWindow();
+      // 1. Sisteme Gir Butonu
+      Rectangle btnEnter = {cx - 220, cy + 30, 200, 45};
+      bool hoverEnter = CheckCollisionPointRec(GetMousePosition(), btnEnter);
+      DrawRectangleRounded(btnEnter, 0.5f, 20,
+                           hoverEnter ? (Color){0, 150, 255, 255} : accentBlue);
+      DrawText("SISTEME GIR",
+               btnEnter.x + 100 - MeasureText("SISTEME GIR", 18) / 2,
+               btnEnter.y + 13, 18, WHITE);
+
+      // 2. Sistemi Kapat Butonu
+      Rectangle btnPower = {cx + 20, cy + 30, 200, 45};
+      bool hoverPower = CheckCollisionPointRec(GetMousePosition(), btnPower);
+      DrawRectangleRounded(btnPower, 0.5f, 20,
+                           hoverPower ? (Color){255, 80, 70, 255} : accentRed);
+      DrawText("KAPAT", btnPower.x + 100 - MeasureText("KAPAT", 18) / 2,
+               btnPower.y + 13, 18, WHITE);
+
+      // Tıklama Kontrolü
+      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (hoverEnter) {
+          // Sisteme girerken binary kontrolü yap
+          if (access("./main_system", F_OK) == 0) {
+            system("./main_system &");
+            CloseWindow();
+            return 0; // Uygulamadan temiz cikis
+          } else {
+            status = "HATA: main_system dosyası bulunamadı!";
+          }
+        }
+        if (hoverPower) {
+          system("poweroff"); // Sistemi kapat (sudo gerektirebilir)
+          CloseWindow();
+          return 0;
+        }
       }
     }
+
+    // Mouse Cursor (Sistem masusu gorunmuyor olabilir)
+    DrawCircle(GetMouseX(), GetMouseY(), 5, WHITE);
+
     EndDrawing();
   }
   CloseWindow();

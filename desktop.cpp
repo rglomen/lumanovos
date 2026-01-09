@@ -23,73 +23,39 @@ std::vector<std::string> GetWallpapers() {
     while ((ent = readdir(dir)) != NULL) {
       std::string name = ent->d_name;
       if (name.find(".png") != std::string::npos ||
-          name.find(".jpg") != std::string::npos) {
+          name.find(".jpg") != std::string::npos)
         images.push_back("images/" + name);
-      }
     }
     closedir(dir);
   }
   return images;
 }
 
-std::string GetCurrentWallpaperPath() {
-  std::ifstream f(".wallpaper_cfg");
-  std::string path;
-  if (f.is_open()) {
-    std::getline(f, path);
-    f.close();
-  }
-  return path;
-}
-
 int main() {
-  InitWindow(1280, 800, "LumanovOS Desktop Environment");
+  SetConfigFlags(FLAG_MSAA_4X_HINT);
+  InitWindow(GetScreenWidth(), GetScreenHeight(), "LumanovOS Desktop");
   SetTargetFPS(60);
 
-  Color bgLight = (Color){240, 240, 245, 255};
-  Color dockBg = (Color){255, 255, 255, 180};
+  // Dark Theme Colors
+  Color bgDark = (Color){10, 10, 12, 255};
+  Color dockBg = (Color){30, 30, 35, 200};
   Color accentBlue = (Color){0, 122, 255, 255};
 
-  std::vector<std::string> allWallpapers = GetWallpapers();
-  std::string currentPath = GetCurrentWallpaperPath();
-
-  if (currentPath.empty() && !allWallpapers.empty()) {
-    srand(time(NULL));
-    currentPath = allWallpapers[rand() % allWallpapers.size()];
-    std::ofstream f(".wallpaper_cfg");
-    f << currentPath;
-    f.close();
-  }
-
+  std::vector<std::string> wp = GetWallpapers();
   Texture2D wallpaper = {0};
-  if (!currentPath.empty())
-    wallpaper = LoadTexture(currentPath.c_str());
+  if (!wp.empty())
+    wallpaper = LoadTexture(wp[0].c_str());
 
   std::vector<App> dockApps = {
       {"Dosyalar", "D", "./file_manager &", (Color){88, 86, 214, 255}},
       {"Ayarlar", "A", "./settings &", (Color){142, 142, 147, 255}},
       {"Terminal", "T", "xterm &", (Color){0, 0, 0, 255}}};
 
-  int checkCounter = 0;
-
   while (!WindowShouldClose()) {
-    // Her 2 saniyede bir ayar dosyasını kontrol et (Basit IPC)
-    checkCounter++;
-    if (checkCounter % 120 == 0) {
-      std::string NewPath = GetCurrentWallpaperPath();
-      if (NewPath != currentPath && !NewPath.empty()) {
-        if (wallpaper.id > 0)
-          UnloadTexture(wallpaper);
-        currentPath = NewPath;
-        wallpaper = LoadTexture(currentPath.c_str());
-      }
-    }
-
     time_t now = time(0);
     struct tm *ltm = localtime(&now);
-    char timeStr[10], dateStr[20];
-    strftime(timeStr, sizeof(timeStr), "%H:%M", ltm);
-    strftime(dateStr, sizeof(dateStr), "%d %b %Y", ltm);
+    char tStr[10];
+    strftime(tStr, sizeof(tStr), "%H:%M", ltm);
 
     BeginDrawing();
     if (wallpaper.id > 0) {
@@ -98,39 +64,30 @@ int main() {
           (Rectangle){0, 0, (float)wallpaper.width, (float)wallpaper.height},
           (Rectangle){0, 0, (float)GetScreenWidth(), (float)GetScreenHeight()},
           (Vector2){0, 0}, 0.0f, WHITE);
-    } else {
-      ClearBackground(bgLight);
-    }
-
-    // Üst Panel
-    DrawRectangle(0, 0, GetScreenWidth(), 30, (Color){255, 255, 255, 150});
-    DrawText("LumanovOS", 15, 7, 16, BLACK);
-    DrawText(timeStr, GetScreenWidth() - 65, 7, 16, BLACK);
+    } else
+      ClearBackground(bgDark);
 
     // Dock
-    float dockWidth = 350;
-    float dockX = (float)GetScreenWidth() / 2 - dockWidth / 2;
-    float dockY = (float)GetScreenHeight() - 90;
-    DrawRectangleRounded((Rectangle){dockX, dockY, dockWidth, 70}, 0.4f, 20,
-                         dockBg);
+    float dx = (float)GetScreenWidth() / 2 - 175;
+    float dy = (float)GetScreenHeight() - 85;
+    DrawRectangleRounded((Rectangle){dx, dy, 350, 70}, 0.4f, 20, dockBg);
 
     for (int i = 0; i < dockApps.size(); i++) {
-      Rectangle iconBounds = {dockX + 40 + (i * 90), dockY + 15, 45, 45};
-      if (CheckCollisionPointRec(GetMousePosition(), iconBounds)) {
-        DrawRectangleRounded(iconBounds, 0.3f, 10, DARKGRAY);
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-          system(dockApps[i].command);
-      }
-      DrawRectangleRounded(iconBounds, 0.3f, 10, dockApps[i].color);
-      DrawText(dockApps[i].icon, iconBounds.x + 15, iconBounds.y + 10, 25,
-               WHITE);
+      Rectangle r = {dx + 40 + (i * 90), dy + 15, 45, 45};
+      bool h = CheckCollisionPointRec(GetMousePosition(), r);
+      DrawRectangleRounded(r, 0.3f, 10, h ? DARKGRAY : dockApps[i].color);
+      DrawText(dockApps[i].icon, r.x + 15, r.y + 10, 25, WHITE);
+      if (h && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        system(dockApps[i].command);
     }
+
+    // Top Bar
+    DrawRectangle(0, 0, GetScreenWidth(), 30, (Color){0, 0, 0, 100});
+    DrawText("LumanovOS", 15, 7, 16, WHITE);
+    DrawText(tStr, GetScreenWidth() - 60, 7, 16, WHITE);
 
     EndDrawing();
   }
-
-  if (wallpaper.id > 0)
-    UnloadTexture(wallpaper);
   CloseWindow();
   return 0;
 }
