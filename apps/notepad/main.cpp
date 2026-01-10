@@ -1,4 +1,4 @@
-#include "../libs/ui/ui.h"
+#include "libs/ui/ui.h"
 #include <cstring>
 #include <fstream>
 #include <string>

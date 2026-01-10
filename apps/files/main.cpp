@@ -1,10 +1,9 @@
-#include "../libs/ui/ui.h"
+#include "libs/ui/ui.h"
 #include <algorithm>
 #include <cstring>
 #include <dirent.h>
 #include <string>
 #include <vector>
-
 
 struct FileEntry {
   std::string name;

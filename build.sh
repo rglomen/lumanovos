@@ -30,8 +30,12 @@ echo "[3/3] Uygulamalar derleniyor..."
 
 for app in files settings terminal notepad browser monitor; do
     if [ -f "apps/$app/main.cpp" ]; then
-        $CXX $CXXFLAGS apps/$app/main.cpp libs/ui/ui.o -o apps/$app/$app $RAYLIB_FLAGS
-        echo "      ✓ apps/$app/$app"
+        $CXX $CXXFLAGS -I. apps/$app/main.cpp libs/ui/ui.o -o apps/$app/$app $RAYLIB_FLAGS 2>&1
+        if [ $? -eq 0 ]; then
+            echo "      ✓ apps/$app/$app"
+        else
+            echo "      ✗ apps/$app hata!"
+        fi
     else
         echo "      - apps/$app/main.cpp bulunamadı, atlanıyor"
     fi
