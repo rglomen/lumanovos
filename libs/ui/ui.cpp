@@ -1,6 +1,7 @@
 #include "ui.h"
 #include <cmath>
 #include <cstring>
+#include <ctime>
 
 namespace LUI {
 
