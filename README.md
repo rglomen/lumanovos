@@ -1,51 +1,107 @@
 # LumanovOS Desktop Environment
 
-Modern, modular desktop environment built with Raylib.
+Modern, modüler masaüstü ortamı. Raylib ile geliştirildi.
 
-## 🚀 Features
+![LumanovOS Logo](assets/logo.png)
 
-- **Modular Design**: Each application runs as a separate binary
-- **Shared UI Library**: Consistent look and feel across all apps
-- **Theme Support**: Dark and Light themes
-- **6 Built-in Applications**: Files, Settings, Terminal, Notepad, Browser, Monitor
+## 🌟 Özellikler
 
-## 📦 Structure
+- **Modüler Mimari**: Her uygulama ayrı binary olarak çalışır
+- **Ortak UI Kütüphanesi**: Tutarlı tasarım ve tema desteği
+- **Koyu/Açık Tema**: Kullanıcı tercihine göre değiştirilebilir
+- **Özel Mouse İmleci**: Tüm uygulamalarda tutarlı görünüm
+- **6 Dahili Uygulama**: Files, Settings, Terminal, Notepad, Browser, Monitor
+
+## 📁 Proje Yapısı
 
 ```
 lumanovos/
-├── libs/ui/          # Shared UI library
-├── core/             # Main shell
-├── apps/             # Applications
-│   ├── files/        # File manager
-│   ├── settings/     # System settings
-│   ├── terminal/     # Terminal emulator
-│   ├── notepad/      # Text editor
-│   ├── browser/      # Web browser launcher
-│   └── monitor/      # System monitor
-├── assets/           # Icons, wallpapers, fonts
-└── config/           # Configuration files
+├── libs/ui/              # Ortak UI kütüphanesi
+│   ├── ui.h              # Header dosyası
+│   └── ui.cpp            # Implementasyon
+├── core/
+│   └── shell.cpp         # Ana masaüstü (dock, panel, menü)
+├── apps/                 # Uygulamalar
+│   ├── files/            # Dosya Yöneticisi
+│   ├── settings/         # Ayarlar (5 tab)
+│   ├── terminal/         # Terminal Emülatörü
+│   ├── notepad/          # Metin Editörü
+│   ├── browser/          # Web Tarayıcı Başlatıcı
+│   └── monitor/          # Sistem Monitörü
+├── assets/               # Görseller ve fontlar
+│   ├── icons/            # Uygulama ikonları
+│   └── wallpapers/       # Arkaplan resimleri
+├── images/               # Ek resimler
+├── config/               # Yapılandırma dosyaları
+├── build.sh              # Derleme scripti
+├── launcher.cpp          # Boot sonrası launcher
+└── version.txt           # Versiyon numarası
 ```
 
-## 🔨 Build
+## 🔨 Derleme
+
+### Gereksinimler
+
+- Linux (Debian/Ubuntu tabanlı)
+- GCC/G++ derleyici
+- Raylib 5.x kütüphanesi
+- X11 geliştirme paketleri
+
+### Kurulum
 
 ```bash
+# Raylib kurulumu (Ubuntu/Debian)
+sudo apt update
+sudo apt install libraylib-dev
+
+# Projeyi klonla
+git clone https://github.com/rglomen/lumanovos.git
+cd lumanovos
+
+# Derle
 chmod +x build.sh
 ./build.sh
 ```
 
-## 🎯 Run
+### Çalıştırma
 
 ```bash
 ./bin/lumanovos-shell
 ```
 
-## 📋 Requirements
+## 🎯 Uygulamalar
 
-- Linux (Debian/Ubuntu based)
-- Raylib 5.x
-- GCC/G++
-- X11
+| Uygulama | Açıklama | Kısayol |
+|----------|----------|---------|
+| **Files** | Dosya gezgini, klasör navigasyonu | F |
+| **Settings** | Tema, arkaplan, ses, sistem ayarları | S |
+| **Terminal** | Komut satırı, shell erişimi | > |
+| **Notepad** | Metin düzenleme, dosya kaydetme | N |
+| **Browser** | Firefox ile web sayfası açma | W |
+| **Monitor** | CPU, RAM, Disk kullanımı | M |
 
-## 📜 License
+## ⚙️ Ayarlar Menüsü
 
-LumanovOS Desktop - A lightweight desktop environment
+1. **Görünüm**: Koyu/Açık tema, accent renk, parlaklık
+2. **Arkaplan**: Wallpaper seçimi
+3. **Ses**: Ana ses, müzik, efekt seviyeleri
+4. **Sistem**: Otomatik başlatma, saat formatı, yeniden başlat/kapat
+5. **Hakkında**: Versiyon, sistem bilgileri (CPU, RAM, Disk, Kernel)
+
+## 🖱️ Kullanım
+
+- **Dock**: Ekranın altında, uygulamaları başlatmak için tıkla
+- **Üst Panel**: Sol üstte sistem adı, ortada saat, sağda sistem menüsü
+- **Sistem Menüsü**: Tema değiştirme, ayarlar, yeniden başlat, kapat
+
+## 📝 Geliştirme
+
+Detaylı geliştirme bilgisi için: [DEVELOPMENT.md](DEVELOPMENT.md)
+
+## 📜 Lisans
+
+MIT License - Serbestçe kullanın ve değiştirin.
+
+---
+
+**LumanovOS** - Hafif, hızlı, modern masaüstü deneyimi.
