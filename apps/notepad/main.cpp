@@ -55,10 +55,18 @@ void SaveFile() {
   }
 }
 
+void DrawCustomCursor(Vector2 pos) {
+  DrawTriangle(pos, {pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, WHITE);
+  DrawLineEx(pos, {pos.x, pos.y + 18}, 1.5f, BLACK);
+  DrawLineEx(pos, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+  DrawLineEx({pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+}
+
 int main() {
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
   InitWindow(700, 500, "Notepad");
   SetTargetFPS(60);
+  HideCursor();
   LUI::SetTheme(true);
 
   NewFile();
@@ -197,13 +205,17 @@ int main() {
 
     // Durum çubuğu
     DrawRectangle(0, h - 25, w, 25, LUI::currentTheme->panelBg);
-    DrawText(TextFormat("Satır: %d  Sütun: %d  %s", cursorLine + 1,
-                        cursorCol + 1, modified ? "[Değiştirildi]" : ""),
+    DrawText(TextFormat("Satir: %d  Sutun: %d  %s", cursorLine + 1,
+                        cursorCol + 1, modified ? "[Degistirildi]" : ""),
              10, h - 20, 12, LUI::currentTheme->textDim);
+
+    // Mouse imleci
+    DrawCustomCursor(mouse);
 
     EndDrawing();
   }
 
+  ShowCursor();
   CloseWindow();
   return 0;
 }

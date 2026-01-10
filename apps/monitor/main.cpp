@@ -69,10 +69,18 @@ void UpdateStats() {
   }
 }
 
+void DrawCustomCursor(Vector2 pos) {
+  DrawTriangle(pos, {pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, WHITE);
+  DrawLineEx(pos, {pos.x, pos.y + 18}, 1.5f, BLACK);
+  DrawLineEx(pos, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+  DrawLineEx({pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+}
+
 int main() {
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
-  InitWindow(500, 450, "Sistem Monitörü");
+  InitWindow(500, 450, "Sistem Monitoru");
   SetTargetFPS(60);
+  HideCursor();
   LUI::SetTheme(true);
 
   double lastUpdate = 0;
@@ -152,12 +160,17 @@ int main() {
       UpdateStats();
     }
 
-    DrawText("Otomatik güncelleme: 2sn", 160, y + 8, 12,
+    DrawText("Otomatik guncelleme: 2sn", 160, y + 8, 12,
              LUI::currentTheme->textDim);
+
+    // Mouse imleci
+    Vector2 mouse = GetMousePosition();
+    DrawCustomCursor(mouse);
 
     EndDrawing();
   }
 
+  ShowCursor();
   CloseWindow();
   return 0;
 }

@@ -5,10 +5,18 @@
 
 std::string urlInput;
 
+void DrawCustomCursor(Vector2 pos) {
+  DrawTriangle(pos, {pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, WHITE);
+  DrawLineEx(pos, {pos.x, pos.y + 18}, 1.5f, BLACK);
+  DrawLineEx(pos, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+  DrawLineEx({pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+}
+
 int main() {
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
-  InitWindow(550, 400, "Web Tarayıcı");
+  InitWindow(550, 400, "Web Tarayici");
   SetTargetFPS(60);
+  HideCursor();
   LUI::SetTheme(true);
 
   char urlText[512] = "";
@@ -98,12 +106,16 @@ int main() {
     DrawText("veya hızlı erişim butonlarını kullanın.", 15, y, 13,
              LUI::currentTheme->textDim);
     y += 30;
-    DrawText("* Harici Firefox tarayıcısı açılacaktır", 15, y, 12,
+    DrawText("* Harici Firefox tarayicisi acilacaktir", 15, y, 12,
              LUI::currentTheme->textDim);
+
+    // Mouse imleci
+    DrawCustomCursor(mouse);
 
     EndDrawing();
   }
 
+  ShowCursor();
   CloseWindow();
   return 0;
 }

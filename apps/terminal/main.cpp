@@ -39,14 +39,22 @@ void ExecuteCommand(const std::string &cmd) {
   }
 }
 
+void DrawCustomCursor(Vector2 pos) {
+  DrawTriangle(pos, {pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, WHITE);
+  DrawLineEx(pos, {pos.x, pos.y + 18}, 1.5f, BLACK);
+  DrawLineEx(pos, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+  DrawLineEx({pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+}
+
 int main() {
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
   InitWindow(700, 450, "Terminal");
   SetTargetFPS(60);
+  HideCursor();
   LUI::SetTheme(true);
 
   outputLines.push_back("LumanovOS Terminal v1.0");
-  outputLines.push_back("Yardım için 'help' yazın.");
+  outputLines.push_back("Yardim icin 'help' yazin.");
   outputLines.push_back("");
 
   while (!WindowShouldClose()) {
@@ -128,9 +136,13 @@ int main() {
       }
     }
 
+    // Mouse imleci
+    DrawCustomCursor(mouse);
+
     EndDrawing();
   }
 
+  ShowCursor();
   CloseWindow();
   return 0;
 }

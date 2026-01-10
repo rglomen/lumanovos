@@ -24,15 +24,30 @@ const char *appPaths[] = {
 // ============================================================================
 bool showSystemMenu = false;
 Texture2D wallpaper = {0};
+
+// Dock iconları - basit ve net semboller
 LUI::DockItem dockItems[] = {
-    {"Dosyalar", "📁", {0, 122, 255, 255}, false, 0},
-    {"Ayarlar", "⚙", {142, 142, 147, 255}, false, 0},
-    {"Terminal", ">_", {40, 40, 45, 255}, false, 0},
-    {"Notepad", "📝", {255, 204, 0, 255}, false, 0},
-    {"Tarayici", "🌐", {255, 87, 51, 255}, false, 0},
-    {"Monitor", "📊", {76, 175, 80, 255}, false, 0},
+    {"Dosyalar", "F", {0, 122, 255, 255}, false, 0},
+    {"Ayarlar", "S", {142, 142, 147, 255}, false, 0},
+    {"Terminal", ">", {40, 40, 45, 255}, false, 0},
+    {"Notepad", "N", {255, 204, 0, 255}, false, 0},
+    {"Tarayici", "W", {255, 87, 51, 255}, false, 0},
+    {"Monitor", "M", {76, 175, 80, 255}, false, 0},
 };
 const int dockItemCount = 6;
+
+// ============================================================================
+// MOUSE İMLECİ
+// ============================================================================
+void DrawCustomCursor(Vector2 pos) {
+  // Modern ok imleci - beyaz dolgu, siyah kenar
+  DrawTriangle(pos, {pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, WHITE);
+  DrawTriangle(pos, {pos.x + 1, pos.y + 1}, {pos.x + 12, pos.y + 12},
+               Fade(BLACK, 0.3f));
+  DrawLineEx(pos, {pos.x, pos.y + 18}, 1.5f, BLACK);
+  DrawLineEx(pos, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+  DrawLineEx({pos.x, pos.y + 18}, {pos.x + 12, pos.y + 12}, 1.5f, BLACK);
+}
 
 // ============================================================================
 // FONKSİYONLAR
@@ -48,33 +63,42 @@ void DrawSystemMenu() {
   int w = GetScreenWidth();
   Vector2 mouse = GetMousePosition();
 
-  Rectangle menuRect = {(float)w - 200, 32, 190, 140};
+  Rectangle menuRect = {(float)w - 220, 32, 210, 200};
   DrawRectangleRounded(menuRect, 0.1f, 10, LUI::currentTheme->windowBg);
   DrawRectangleRoundedLines(menuRect, 0.1f, 10, LUI::currentTheme->border);
 
   float y = menuRect.y + 10;
 
   // Tema değiştir
-  Rectangle themeBtn = {menuRect.x + 10, y, 170, 32};
-  if (LUI::ListItem(themeBtn, LUI::isDarkTheme ? "Acik Tema" : "Koyu Tema",
-                    false, "🎨")) {
+  Rectangle themeBtn = {menuRect.x + 10, y, 190, 36};
+  if (LUI::ListItem(themeBtn,
+                    LUI::isDarkTheme ? "Acik Temaya Gec" : "Koyu Temaya Gec",
+                    false, "T")) {
     LUI::SetTheme(!LUI::isDarkTheme);
   }
-  y += 36;
+  y += 40;
 
-  LUI::Separator(menuRect.x + 10, y, 170);
+  // Ayarları aç
+  Rectangle settingsBtn = {menuRect.x + 10, y, 190, 36};
+  if (LUI::ListItem(settingsBtn, "Tum Ayarlar", false, "S")) {
+    LaunchApp(APP_SETTINGS);
+    showSystemMenu = false;
+  }
+  y += 44;
+
+  LUI::Separator(menuRect.x + 10, y, 190);
   y += 10;
 
   // Yeniden başlat
-  Rectangle restartBtn = {menuRect.x + 10, y, 170, 32};
-  if (LUI::ListItem(restartBtn, "Yeniden Baslat", false, "🔄")) {
+  Rectangle restartBtn = {menuRect.x + 10, y, 190, 36};
+  if (LUI::ListItem(restartBtn, "Yeniden Baslat", false, "R")) {
     system("echo 120820 | sudo -S reboot");
   }
-  y += 36;
+  y += 40;
 
   // Kapat
-  Rectangle shutdownBtn = {menuRect.x + 10, y, 170, 32};
-  if (LUI::ListItem(shutdownBtn, "Sistemi Kapat", false, "⏻")) {
+  Rectangle shutdownBtn = {menuRect.x + 10, y, 190, 36};
+  if (LUI::ListItem(shutdownBtn, "Sistemi Kapat", false, "X")) {
     system("echo 120820 | sudo -S poweroff");
   }
 
@@ -86,13 +110,15 @@ void DrawSystemMenu() {
 }
 
 void LoadWallpaper() {
-  // İlk bulunan wallpaper'ı yükle
-  if (FileExists("assets/wallpapers/default.png")) {
-    wallpaper = LoadTexture("assets/wallpapers/default.png");
-  } else if (FileExists("assets/wallpapers/default.jpg")) {
-    wallpaper = LoadTexture("assets/wallpapers/default.jpg");
-  } else if (FileExists("images/1.jpg")) {
-    wallpaper = LoadTexture("images/1.jpg");
+  const char *paths[] = {
+      "assets/wallpapers/default.png", "assets/wallpapers/default.jpg",
+      "assets/wallpapers/1.jpg", "images/1.jpg", "images/default.jpg"};
+
+  for (int i = 0; i < 5; i++) {
+    if (FileExists(paths[i])) {
+      wallpaper = LoadTexture(paths[i]);
+      break;
+    }
   }
 }
 
@@ -100,13 +126,15 @@ void LoadWallpaper() {
 // MAIN
 // ============================================================================
 int main() {
-  // Pencere başlat
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
   InitWindow(1280, 800, "LumanovOS Desktop");
   SetTargetFPS(60);
 
+  // Sistem mouse'unu gizle
+  HideCursor();
+
   // Tema ayarla
-  LUI::SetTheme(true); // Koyu tema
+  LUI::SetTheme(true);
 
   // Wallpaper yükle
   LoadWallpaper();
@@ -125,7 +153,13 @@ int main() {
                      {0, 0, (float)wallpaper.width, (float)wallpaper.height},
                      {0, 0, (float)w, (float)h}, {0, 0}, 0, WHITE);
     } else {
-      ClearBackground(LUI::currentTheme->background);
+      // Gradient arkaplan
+      for (int i = 0; i < h; i++) {
+        float t = (float)i / h;
+        Color c = {(unsigned char)(20 + t * 10), (unsigned char)(22 + t * 15),
+                   (unsigned char)(30 + t * 20), 255};
+        DrawLine(0, i, w, i, c);
+      }
     }
 
     // Üst panel
@@ -146,10 +180,14 @@ int main() {
       DrawSystemMenu();
     }
 
+    // Özel mouse imleci (en son çiz)
+    DrawCustomCursor(mouse);
+
     EndDrawing();
   }
 
   // Temizlik
+  ShowCursor();
   if (wallpaper.id > 0)
     UnloadTexture(wallpaper);
   CloseWindow();
